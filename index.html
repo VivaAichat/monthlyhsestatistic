@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HSE 月統計平台</title>
+<style>
+:root{--navy:#0d2b3e;--navy2:#123a52;--green:#1f6f5c;--green2:#2c8a72;--ink:#1a2430;
+--muted:#6b7a86;--line:#e3e8ec;--bg:#f4f6f8;--card:#fff;--warn:#c0392b;--chip:#eef4f2;}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI","Noto Sans TC",system-ui,Arial,sans-serif;color:var(--ink);
+background:var(--bg);font-size:14px;line-height:1.5}
+a{color:var(--green);text-decoration:none}
+h1{font-size:21px;margin:0 0 4px}h2{font-size:16px;margin:0 0 12px;color:var(--navy)}
+.muted{color:var(--muted)}.en{color:var(--muted);font-size:12px}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.wrap{max-width:1140px;margin:0 auto;padding:20px 16px 60px}
+.topbar{background:var(--navy);color:#fff;padding:10px 16px;display:flex;justify-content:space-between;
+align-items:center;flex-wrap:wrap;gap:8px}
+.brand{font-weight:600}.brand small{display:block;font-weight:400;font-size:11px;opacity:.7}
+.topbar nav{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.topbar nav a{color:#dbe7ea;cursor:pointer}.topbar nav a.active{color:#fff;font-weight:600}
+.topbar .who{color:#9fb4bd;font-size:12px}.topbar .lo{color:#ffd2cc;cursor:pointer}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.cards,.grid-2{grid-template-columns:1fr}}
+.metric{text-align:center}.metric b{font-size:28px;color:var(--navy);display:block}.metric span{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);background:#fafbfc}
+.compact th,.compact td{padding:4px 8px;font-size:13px}
+input,select{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff;width:100%}
+input:focus,select:focus{outline:2px solid var(--green2);outline-offset:-1px}
+input[type=number]{text-align:right}
+.cellw{width:150px}
+.btn{display:inline-block;padding:8px 14px;border:1px solid var(--line);background:#fff;color:var(--ink);
+border-radius:7px;cursor:pointer;font:inherit}
+.btn:hover{border-color:#c7d0d6}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff}.btn.primary:hover{background:var(--green2)}
+.btn.small{padding:4px 10px;font-size:12px}.btn.ghost{background:transparent}
+.btn.danger{color:var(--warn);border-color:#e6c3bf}
+.rowacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.formacts{position:sticky;bottom:0;background:var(--bg);padding:12px 0;display:flex;gap:10px;border-top:1px solid var(--line)}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600}
+.s-NOT_STARTED{background:#eceff1;color:#607d8b}.s-DRAFT{background:#e8f0fe;color:#3b6fb6}
+.s-SUBMITTED,.s-RESUBMITTED{background:#e6f4ea;color:#1f8a4c}.s-RETURNED{background:#fdecea;color:#c0392b}
+.s-APPROVED{background:#e2f3ec;color:#1f6f5c}.s-LOCKED{background:#ede7f6;color:#5e4b8b}
+.chip{background:var(--chip);color:var(--green);padding:2px 8px;border-radius:6px;font-size:11px;margin-left:6px}
+.req{color:var(--warn)}
+.alert{background:#eef4f2;border:1px solid #d6e5e0;color:#25493f;padding:10px 12px;border-radius:8px;margin:10px 0}
+.alert.error{background:#fdecea;border-color:#f5c6c0;color:#a5281b}
+.alert.ok{background:#e6f4ea;border-color:#bfe3c9;color:#1f6f4a}
+.login{max-width:360px;margin:8vh auto}
+.login h1{color:var(--navy)}.login label{display:block;margin:10px 0;font-size:13px}
+.msg{min-height:18px;font-size:13px;margin:6px 0}
+.section h2 .chip{vertical-align:middle}
+.setup{max-width:560px;margin:8vh auto}
+.setup code{background:#0d2b3e;color:#d7e6ea;padding:2px 6px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+/* ====== 設定：把你部署 Apps Script Web App 後得到的 /exec 網址貼在這裡 ====== */
+var API_URL = "https://script.google.com/macros/s/AKfycbzgU2w35l-9WR9cywjY9hyc5up7PQtSCMIohtE485kUV7lIyLf-VWqtN0ymhDKe1PFHQA/exec";
+/* ========================================================================= */
+
+var S = { token: null, user: null, spec: null, view: "dashboard", state: null };
+
+function $(sel, el){ return (el||document).querySelector(sel); }
+function el(html){ var d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstChild; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+async function call(action, extra){
+  var body = Object.assign({ action: action, token: S.token }, extra||{});
+  var res = await fetch(API_URL, { method:"POST",
+    headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(body) });
+  var data = await res.json();
+  if (data && data.error === "請重新登入"){ logout(); throw new Error(data.error); }
+  return data;
+}
+
+/* ---------------- 開機 ---------------- */
+window.addEventListener("DOMContentLoaded", function(){
+  if (API_URL.indexOf("PASTE_YOUR") === 0){ renderSetupNeeded(); return; }
+  S.token = localStorage.getItem("hse_token");
+  S.user = JSON.parse(localStorage.getItem("hse_user")||"null");
+  S.spec = JSON.parse(localStorage.getItem("hse_spec")||"null");
+  if (S.token && S.user){ refresh().then(renderApp).catch(renderLogin); }
+  else renderLogin();
+});
+
+function renderSetupNeeded(){
+  document.getElementById("root").innerHTML =
+   '<div class="setup card"><h1>尚未設定後端網址</h1>'+
+   '<p class="muted">請開啟本檔 <code>index.html</code>，把最上方 <code>API_URL</code> 換成你部署 Apps Script 後得到的 <code>/exec</code> 網址，再重新整理。設定步驟見隨附說明文件。</p></div>';
+}
+
+/* ---------------- 登入 ---------------- */
+function renderLogin(){
+  var root = document.getElementById("root");
+  root.innerHTML = "";
+  var box = el(
+   '<div class="login card"><h1>HSE 月統計平台</h1>'+
+   '<p class="muted">Project HSE Monthly Statistics</p>'+
+   '<div class="msg" id="loginMsg"></div>'+
+   '<label>帳號 Username<input id="u" autofocus></label>'+
+   '<label>密碼 Password<input id="p" type="password"></label>'+
+   '<button class="btn primary" id="loginBtn" style="width:100%">登入</button>'+
+   '<p class="muted" style="margin-top:14px;font-size:12px">帳號：sam / jeffrey / jin / sue / yong / paul / lin</p></div>');
+  root.appendChild(box);
+  function doLogin(){
+    var u=$("#u").value.trim(), p=$("#p").value;
+    call("login",{username:u,password:p}).then(function(r){
+      if(!r.ok){ $("#loginMsg").innerHTML='<span style="color:#c0392b">'+esc(r.error)+'</span>'; return; }
+      S.token=r.token; S.user=r.user; S.spec=r.spec;
+      localStorage.setItem("hse_token",r.token);
+      localStorage.setItem("hse_user",JSON.stringify(r.user));
+      localStorage.setItem("hse_spec",JSON.stringify(r.spec));
+      S.view="dashboard"; refresh().then(renderApp);
+    }).catch(function(e){ $("#loginMsg").innerHTML='<span style="color:#c0392b">連線失敗：'+esc(e.message)+'</span>'; });
+  }
+  $("#loginBtn").onclick=doLogin;
+  box.addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
+}
+
+function logout(){
+  localStorage.removeItem("hse_token"); localStorage.removeItem("hse_user");
+  S.token=null; S.user=null; renderLogin();
+}
+
+async function refresh(){ S.state = await call("getState",{}); if(!S.state.ok) throw new Error(S.state.error||"error"); return S.state; }
+
+/* ---------------- App 外框 ---------------- */
+function renderApp(){
+  var root=document.getElementById("root");
+  var isMgr = S.user.role==="MANAGER";
+  root.innerHTML="";
+  var nav = el('<header class="topbar"><div class="brand">NMDC · HSE 月統計<small>Monthly Statistics</small></div>'+
+    '<nav>'+
+    tab("dashboard","Dashboard")+
+    tab("form","我的申報")+
+    (isMgr?tab("review","Manager Review"):"")+
+    (isMgr?tab("report","報表輸出"):"")+
+    '<span class="who">'+esc(S.user.name)+'（'+esc(S.user.role)+'）</span>'+
+    '<a class="lo" id="logoutLink">登出</a></nav></header>');
+  root.appendChild(nav);
+  var wrap=el('<main class="wrap" id="view"></main>'); root.appendChild(wrap);
+  nav.querySelectorAll("nav a[data-view]").forEach(function(a){
+    a.onclick=function(){ S.view=a.getAttribute("data-view"); renderView(); };
+  });
+  $("#logoutLink").onclick=logout;
+  renderView();
+}
+function tab(v,label){ return '<a data-view="'+v+'" class="'+(S.view===v?"active":"")+'">'+label+'</a>'; }
+
+function renderView(){
+  document.querySelectorAll(".topbar nav a[data-view]").forEach(function(a){
+    a.className = a.getAttribute("data-view")===S.view?"active":"";
+  });
+  var v=$("#view"); v.innerHTML="";
+  if(S.view==="dashboard") renderDashboard(v);
+  else if(S.view==="form") renderForm(v);
+  else if(S.view==="review") renderReview(v);
+  else if(S.view==="report") renderReport(v);
+}
+
+/* ---------------- Dashboard ---------------- */
+function renderDashboard(v){
+  var ov=S.state.overview, mine=S.state.mine.status;
+  var mySecs = (S.spec.assignments[S.user.key]||[]).map(function(a){return S.spec.sections[a[1]].zh;});
+  v.appendChild(el('<div class="page-head"><div><h1>'+esc(S.state.period)+'</h1>'+
+    '<div class="muted">Project HSE Monthly Statistics</div></div></div>'));
+  v.appendChild(el('<div class="cards">'+
+    '<div class="card metric"><b>'+ov.percent+'%</b><span>完成比例（'+ov.submitted+'/'+ov.total+'）</span></div>'+
+    '<div class="card metric"><b>'+(ov.not_submitted.length)+'</b><span>尚未提交人數</span></div>'+
+    '<div class="card metric"><b><span class="badge s-'+(mine.status||"NOT_STARTED")+'">'+statusLabel(mine.status)+'</span></b><span>我的狀態</span></div>'+
+    '<div class="card metric"><b>'+(mine.version||0)+'</b><span>我的提交版次</span></div></div>'));
+  var rows=ov.rows.map(function(r){
+    return '<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.role)+'</td>'+
+      '<td><span class="badge s-'+r.status+'">'+statusLabel(r.status)+'</span></td>'+
+      '<td>'+(r.version||"—")+'</td><td class="muted">'+esc(r.returned_reason||"")+'</td></tr>';
+  }).join("");
+  v.appendChild(el('<div class="grid-2">'+
+    '<section class="card"><h2>各人員提交狀態</h2><table><thead><tr><th>人員</th><th>角色</th><th>狀態</th><th>版次</th><th>退回原因</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    (ov.not_submitted.length?'<p class="muted">尚未提交：'+esc(ov.not_submitted.join("、"))+'</p>':'')+'</section>'+
+    '<section class="card"><h2>我的申報</h2>'+
+    (mine.status==="RETURNED"?'<div class="alert error">已被退回：'+esc(mine.returned_reason)+'</div>':'')+
+    '<p class="muted">負責項目：'+esc(mySecs.join("、"))+'</p>'+
+    '<button class="btn primary" id="goForm">前往填寫</button></section></div>'));
+  $("#goForm").onclick=function(){ S.view="form"; renderView(); };
+}
+function statusLabel(s){return {NOT_STARTED:"尚未開始",DRAFT:"草稿",SUBMITTED:"已提交",RETURNED:"已退回",APPROVED:"已核准",LOCKED:"已鎖定"}[s]||s||"尚未開始";}
+
+/* ---------------- 我的申報表單 ---------------- */
+function renderForm(v){
+  var period=S.state.period, mine=S.state.mine, spec=S.spec;
+  var pairs = S.user.role==="MANAGER"
+      ? Object.keys(spec.sections).filter(function(k){return !spec.sections[k].detail && ["PROJECT_GENERAL","INCIDENTS","LTI_DETAILS","ENERGY"].indexOf(k)>=0;}).map(function(k){return ["PROJECT_WIDE",k];})
+      : (spec.assignments[S.user.key]||[]);
+  var st=mine.status.status;
+  var readOnly = (st==="SUBMITTED"||st==="APPROVED"||st==="LOCKED");
+
+  // 既有值索引
+  var vmap={}; (mine.values||[]).forEach(function(r){ vmap[r.section+"|"+r.field]=r; });
+
+  v.appendChild(el('<div class="page-head"><div><h1>我的申報 — '+esc(period)+'</h1>'+
+    '<div class="muted">'+esc(S.user.name)+' · <span class="badge s-'+st+'">'+statusLabel(st)+'</span>'+(mine.status.version?'（v'+mine.status.version+'）':'')+'</div></div></div>'));
+  if(st==="RETURNED") v.appendChild(el('<div class="alert error">此申報已被退回：'+esc(mine.status.returned_reason)+'。修改後重新提交。</div>'));
+  if(readOnly) v.appendChild(el('<div class="alert">目前唯讀（已提交／已核准）。需修改請待經理退回。</div>'));
+  v.appendChild(el('<div class="msg" id="formMsg"></div>'));
+
+  var form=el('<form id="hseForm"></form>'); v.appendChild(form);
+
+  pairs.forEach(function(pair){
+    var site=pair[0], code=pair[1], sec=spec.sections[code];
+    var sc=el('<section class="card section" data-section="'+code+'"><h2>'+esc(sec.zh)+' <span class="en">'+esc(sec.en)+'</span>'+
+      (site!=="PROJECT_WIDE"?'<span class="chip">'+esc(site)+'</span>':'')+'</h2></section>');
+    if(!sec.detail){
+      var rows=sec.fields.map(function(f){
+        var r=vmap[code+"|"+f.code]||{};
+        var val = f.type==="date"?(r.date||""):(f.type==="text"?(r.text||""):(r.value===0?0:(r.value||"")));
+        var type = f.type==="date"?"date":(f.type==="text"?"text":"number");
+        var stepAttr = (f.type==="int")?'step="1"':(f.type==="decimal"?'step="any"':"");
+        return '<tr><td>'+esc(f.zh)+(f.required?' <span class="req">*</span>':'')+'</td>'+
+          '<td class="en">'+esc(f.en)+'</td><td class="muted">'+esc(f.unit||"")+'</td>'+
+          '<td><input class="cell cellw" data-section="'+code+'" data-field="'+f.code+'" data-type="'+f.type+'" type="'+type+'" '+(f.type!=="text"&&f.type!=="date"?'min="0" '+stepAttr:"")+' value="'+esc(val)+'" '+(readOnly?"disabled":"")+'></td>'+
+          '<td><input class="note" data-section="'+code+'" data-field="'+f.code+'" value="'+esc(r.notes||"")+'" placeholder="選填" '+(readOnly?"disabled":"")+'></td></tr>';
+      }).join("");
+      sc.appendChild(el('<table><thead><tr><th>欄位</th><th>Excel 欄位</th><th>單位</th><th>數值</th><th>備註</th></tr></thead><tbody>'+rows+'</tbody></table>'));
+    } else if(sec.detail==="training"){
+      sc.appendChild(el('<p class="muted">計算時數 = 出席人次 × 每人時數；系統依類別自動帶入預設時數，可逐列調整。</p>'));
+      sc.appendChild(el('<table id="trainTbl"><thead><tr><th>類別</th><th>子類型</th><th>名稱</th><th>日期</th><th>Sessions</th><th>Attendees</th><th>Hrs/人</th><th>計算</th><th></th></tr></thead><tbody></tbody></table>'));
+      if(!readOnly) sc.appendChild(el('<div class="rowacts">'+
+        ['INDUCTION','GROUP_MEETING','TBT','IN_HOUSE','EXTERNAL'].map(function(c){return '<button type="button" class="btn small" data-add="'+c+'">+ '+c+'</button>';}).join("")+'</div>'));
+    } else if(sec.detail==="observations"){
+      sc.appendChild(el('<p class="muted">分開記錄來源；Unsafe 與 Safe 各自加總。</p>'));
+      sc.appendChild(el('<table id="obsTbl"><thead><tr><th>來源</th><th>類型</th><th>數量</th><th>備註</th><th></th></tr></thead><tbody></tbody></table>'));
+      if(!readOnly) sc.appendChild(el('<div class="rowacts"><button type="button" class="btn small" id="addObs">+ 新增觀察</button></div>'));
+    } else if(sec.detail==="drills"){
+      sc.appendChild(el('<table id="drillTbl"><thead><tr><th>名稱</th><th>日期</th><th>類型</th><th>數量</th><th>備註</th><th></th></tr></thead><tbody></tbody></table>'));
+      if(!readOnly) sc.appendChild(el('<div class="rowacts"><button type="button" class="btn small" id="addDrill">+ 新增演練</button></div>'));
+    }
+    form.appendChild(sc);
+  });
+
+  if(!readOnly) v.appendChild(el('<div class="formacts"><button class="btn" id="saveBtn">儲存草稿</button><button class="btn primary" id="submitBtn">提交</button></div>'));
+
+  // 訓練列
+  var trainBody = form.querySelector("#trainTbl tbody");
+  function trainRow(e){
+    e=e||{};
+    var tr=document.createElement("tr");
+    var cat=e.category||"INDUCTION";
+    var subOpts=spec.gmSubtypes.map(function(s){
+      if(s==="HSE_MONTHLY_MEETING" && S.user.key!==spec.monthlyUser) return "";
+      return '<option value="'+s+'" '+(e.subcategory===s?"selected":"")+'>'+esc(spec.gmLabels[s]||s)+'</option>';}).join("");
+    tr.innerHTML='<td><select class="t-cat">'+['INDUCTION','GROUP_MEETING','TBT','IN_HOUSE','EXTERNAL'].map(function(c){return '<option '+(cat===c?"selected":"")+'>'+c+'</option>';}).join("")+'</select></td>'+
+      '<td><select class="t-sub">'+subOpts+'</select></td>'+
+      '<td><input class="t-title" value="'+esc(e.title||"")+'"></td>'+
+      '<td><input class="t-date" type="date" value="'+esc(e.date||"")+'"></td>'+
+      '<td><input class="t-sess" type="number" min="0" step="1" value="'+(e.sessions||0)+'"></td>'+
+      '<td><input class="t-att" type="number" min="0" step="1" value="'+(e.attendees||0)+'"></td>'+
+      '<td><input class="t-hpa" type="number" min="0" step="any" value="'+(e.hpa===0?0:(e.hpa||""))+'"></td>'+
+      '<td class="t-calc mono">0</td><td><button type="button" class="btn small danger t-del">✕</button></td>';
+    trainBody.appendChild(tr);
+    var catSel=tr.querySelector(".t-cat"), subSel=tr.querySelector(".t-sub"),
+        att=tr.querySelector(".t-att"), hpa=tr.querySelector(".t-hpa"), calc=tr.querySelector(".t-calc");
+    function def(){ return catSel.value==="GROUP_MEETING"?spec.trainingDefaults[subSel.value]:spec.trainingDefaults[catSel.value]; }
+    function syncSub(){ subSel.style.display=catSel.value==="GROUP_MEETING"?"":"none"; }
+    function recalc(){ calc.textContent=((+att.value||0)*(+hpa.value||0)).toFixed(2); }
+    catSel.onchange=function(){ hpa.value=""; syncSub(); var d=def(); if(d!=null)hpa.value=d; recalc(); };
+    subSel.onchange=function(){ var d=def(); if(d!=null)hpa.value=d; recalc(); };
+    att.oninput=recalc; hpa.oninput=recalc;
+    tr.querySelector(".t-del").onclick=function(){ tr.remove(); };
+    syncSub(); if(hpa.value===""){var d=def(); if(d!=null)hpa.value=d;} recalc();
+    if(readOnly) tr.querySelectorAll("input,select,button").forEach(function(x){x.disabled=true;});
+  }
+  if(trainBody){
+    (mine.training||[]).forEach(function(t){ trainRow({category:t.category,subcategory:t.subcategory,title:t.title,date:t.date,sessions:t.sessions,attendees:t.attendees,hpa:t.hpa}); });
+    form.querySelectorAll("[data-add]").forEach(function(b){ b.onclick=function(){ trainRow({category:b.getAttribute("data-add"),subcategory:b.getAttribute("data-add")==="GROUP_MEETING"?"HSE_REVIEW_MEETING":""}); }; });
+  }
+  // 觀察列
+  var obsBody=form.querySelector("#obsTbl tbody");
+  function obsRow(o){ o=o||{}; var tr=document.createElement("tr");
+    tr.innerHTML='<td><select class="o-src">'+["SOC","NMDC_NCR","MANUAL_ADJUSTMENT"].map(function(s){return '<option '+(o.source===s?"selected":"")+'>'+s+'</option>';}).join("")+'</select></td>'+
+      '<td><select class="o-type">'+["UNSAFE","SAFE"].map(function(s){return '<option '+(o.type===s?"selected":"")+'>'+s+'</option>';}).join("")+'</select></td>'+
+      '<td><input class="o-qty" type="number" min="0" step="1" value="'+(o.quantity||0)+'"></td>'+
+      '<td><input class="o-note" value="'+esc(o.notes||"")+'"></td><td><button type="button" class="btn small danger o-del">✕</button></td>';
+    obsBody.appendChild(tr); tr.querySelector(".o-del").onclick=function(){tr.remove();};
+    if(readOnly) tr.querySelectorAll("input,select,button").forEach(function(x){x.disabled=true;}); }
+  if(obsBody){ (mine.observations||[]).forEach(obsRow); var ab=$("#addObs"); if(ab) ab.onclick=function(){obsRow();}; }
+  // 演練列
+  var drillBody=form.querySelector("#drillTbl tbody");
+  function drillRow(d){ d=d||{}; var tr=document.createElement("tr");
+    tr.innerHTML='<td><input class="d-name" value="'+esc(d.name||"")+'"></td>'+
+      '<td><input class="d-date" type="date" value="'+esc(d.date||"")+'"></td>'+
+      '<td><input class="d-type" value="'+esc(d.type||"")+'"></td>'+
+      '<td><input class="d-qty" type="number" min="0" step="1" value="'+(d.quantity!=null?d.quantity:1)+'"></td>'+
+      '<td><input class="d-note" value="'+esc(d.notes||"")+'"></td><td><button type="button" class="btn small danger d-del">✕</button></td>';
+    drillBody.appendChild(tr); tr.querySelector(".d-del").onclick=function(){tr.remove();};
+    if(readOnly) tr.querySelectorAll("input,select,button").forEach(function(x){x.disabled=true;}); }
+  if(drillBody){ (mine.drills||[]).forEach(drillRow); var db=$("#addDrill"); if(db) db.onclick=function(){drillRow();}; }
+
+  function collect(){
+    var payload={values:{}};
+    form.querySelectorAll("input.cell").forEach(function(inp){
+      var s=inp.getAttribute("data-section"), f=inp.getAttribute("data-field");
+      payload.values[s]=payload.values[s]||{}; payload.values[s][f]=payload.values[s][f]||{};
+      payload.values[s][f].value = inp.value===""?null:inp.value;
+    });
+    form.querySelectorAll("input.note").forEach(function(inp){
+      var s=inp.getAttribute("data-section"), f=inp.getAttribute("data-field");
+      if(payload.values[s]&&payload.values[s][f]) payload.values[s][f].notes=inp.value||null;
+    });
+    if(trainBody) payload.training=[].map.call(trainBody.querySelectorAll("tr"),function(tr){
+      return { category:tr.querySelector(".t-cat").value,
+        subcategory:tr.querySelector(".t-cat").value==="GROUP_MEETING"?tr.querySelector(".t-sub").value:"",
+        title:tr.querySelector(".t-title").value||"", date:tr.querySelector(".t-date").value||"",
+        sessions:+tr.querySelector(".t-sess").value||0, attendees:+tr.querySelector(".t-att").value||0,
+        hpa: tr.querySelector(".t-hpa").value===""?"":+tr.querySelector(".t-hpa").value }; });
+    if(obsBody) payload.observations=[].map.call(obsBody.querySelectorAll("tr"),function(tr){
+      return { source:tr.querySelector(".o-src").value, type:tr.querySelector(".o-type").value,
+        quantity:+tr.querySelector(".o-qty").value||0, notes:tr.querySelector(".o-note").value||"" }; });
+    if(drillBody) payload.drills=[].map.call(drillBody.querySelectorAll("tr"),function(tr){
+      return { name:tr.querySelector(".d-name").value||"", date:tr.querySelector(".d-date").value||"",
+        type:tr.querySelector(".d-type").value||"", quantity:+tr.querySelector(".d-qty").value||0,
+        notes:tr.querySelector(".d-note").value||"" }; });
+    return payload;
+  }
+  function msg(t,ok){ var m=$("#formMsg"); m.innerHTML='<span style="color:'+(ok===false?"#c0392b":"#1f6f5c")+'">'+esc(t)+'</span>'; }
+  var sb=$("#saveBtn"), ub=$("#submitBtn");
+  if(sb) sb.onclick=function(){ call("saveDraft",{payload:collect()}).then(function(r){
+      if(!r.ok){msg(r.error,false);return;} S.state.mine=r.mine; msg("已儲存草稿 · "+new Date().toLocaleTimeString()); }).catch(function(e){msg(e.message,false);}); };
+  if(ub) ub.onclick=function(){ call("saveDraft",{payload:collect()}).then(function(r){
+      if(!r.ok){msg(r.error,false);return;}
+      return call("submit",{}).then(function(r2){ if(!r2.ok){msg(r2.error,false);return;}
+        msg("已提交"); refresh().then(function(){S.view="dashboard";renderView();}); }); }).catch(function(e){msg(e.message,false);}); };
+}
+
+/* ---------------- Manager Review ---------------- */
+function renderReview(v){
+  var ov=S.state.overview, agg=S.state.aggregate||{};
+  v.appendChild(el('<div class="page-head"><div><h1>Manager Review — '+esc(S.state.period)+'</h1></div></div>'));
+  var rows=ov.rows.map(function(r){
+    var acts = (r.status==="SUBMITTED")
+      ? '<button class="btn small" data-approve="'+r.key+'">核准</button> <button class="btn small danger" data-return="'+r.key+'">退回</button>'
+      : (r.status==="APPROVED"?'<span class="muted">已核准</span>':'<span class="muted">—</span>');
+    return '<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.role)+'</td>'+
+      '<td><span class="badge s-'+r.status+'">'+statusLabel(r.status)+'</span></td><td>'+acts+'</td></tr>';
+  }).join("");
+  var sec=el('<section class="card"><h2>提交狀態與審查</h2><table><thead><tr><th>人員</th><th>角色</th><th>狀態</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<p class="muted">尚未提交：'+esc(ov.not_submitted.join("、")||"無")+' · 完成 '+ov.percent+'%</p></section>');
+  v.appendChild(sec);
+  v.appendChild(el('<div class="msg" id="revMsg"></div>'));
+  var fin=el('<section class="card"><h2>最終核准（產生給總部的彙整）</h2>'+
+    '<div class="rowacts"><button class="btn primary" id="finBtn">最終核准並寫入報表</button>'+
+    '<button class="btn ghost" id="toReport">前往報表輸出</button></div>'+
+    '<p class="muted">全員提交後按此，系統彙整並寫入 Statistics 分頁,即可下載 Excel 給長官。</p></section>');
+  v.appendChild(fin);
+  // 即時彙整預覽
+  v.appendChild(aggCard("即時彙整預覽", agg));
+
+  sec.querySelectorAll("[data-approve]").forEach(function(b){ b.onclick=function(){
+    call("approve",{user_key:b.getAttribute("data-approve")}).then(function(r){ if(!r.ok){revMsg(r.error,false);return;} refresh().then(renderView); }); }; });
+  sec.querySelectorAll("[data-return]").forEach(function(b){ b.onclick=function(){
+    var reason=prompt("退回原因："); if(!reason) return;
+    call("returnSubmission",{user_key:b.getAttribute("data-return"),reason:reason}).then(function(r){ if(!r.ok){revMsg(r.error,false);return;} refresh().then(renderView); }); }; });
+  $("#finBtn").onclick=function(){ call("finalize",{}).then(function(r){
+      if(!r.ok){revMsg(r.error,false);return;}
+      revMsg("已最終核准並寫入報表。可到「報表輸出」開啟 Google Sheet 下載 Excel。");
+      refresh().then(renderView); }).catch(function(e){revMsg(e.message,false);}); };
+  $("#toReport").onclick=function(){ S.view="report"; renderView(); };
+  function revMsg(t,ok){ $("#revMsg").innerHTML='<span style="color:'+(ok===false?"#c0392b":"#1f6f5c")+'">'+esc(t)+'</span>'; }
+}
+
+function aggCard(title, agg){
+  var map=S.spec.columnMap;
+  var rows=map.map(function(m){ var val=agg[m[0]]; return '<tr><td class="mono">'+m[1]+'</td><td class="en">'+esc(m[2])+'</td><td>'+esc(val==null?"":val)+'</td></tr>'; }).join("");
+  return el('<section class="card"><h2>'+esc(title)+'</h2><table class="compact"><thead><tr><th>Col</th><th>Field</th><th>Value</th></tr></thead><tbody>'+rows+'</tbody></table></section>');
+}
+
+/* ---------------- 報表輸出 ---------------- */
+function renderReport(v){
+  v.appendChild(el('<div class="page-head"><div><h1>報表輸出 — '+esc(S.state.period)+'</h1>'+
+    '<div class="muted">給總部長官的月統計彙整</div></div></div>'));
+  v.appendChild(el('<div class="msg" id="repMsg">彙整中…</div>'));
+  call("report",{}).then(function(r){
+    if(!r.ok){ $("#repMsg").innerHTML='<span style="color:#c0392b">'+esc(r.error)+'</span>'; return; }
+    $("#repMsg").innerHTML="";
+    var acts=el('<section class="card"><h2>取得給長官的 Excel</h2>'+
+      '<div class="rowacts">'+
+      (r.sheetUrl?'<a class="btn primary" target="_blank" href="'+esc(r.sheetUrl)+'">開啟 Google Sheet（下載 Excel）</a>':'')+
+      '<button class="btn" id="csvBtn">下載 CSV</button></div>'+
+      '<p class="muted">開啟 Sheet 後：檔案 → 下載 → Microsoft Excel（.xlsx）。若要帶品牌範本的正式版，用隨附 Python 產生器對已核准資料產出即可。</p></section>');
+    v.appendChild(acts);
+    v.appendChild(aggCard("彙整結果（Statistics 欄位順序）", r.aggregate));
+    $("#csvBtn").onclick=function(){ downloadCSV(r.aggregate, r.columnMap); };
+  }).catch(function(e){ $("#repMsg").innerHTML='<span style="color:#c0392b">'+esc(e.message)+'</span>'; });
+}
+function downloadCSV(agg, map){
+  var lines=[["Field","Excel Col","Value"]];
+  map.forEach(function(m){ lines.push([m[2],m[1],(agg[m[0]]==null?"":agg[m[0]])]); });
+  var csv="\ufeff"+lines.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(",");}).join("\n");
+  var blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="HSE_Statistics_"+S.state.period+".csv"; a.click();
+}
+</script>
+</body>
+</html>
