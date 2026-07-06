@@ -63,10 +63,15 @@ border-radius:7px;cursor:pointer;font:inherit}
 <div id="root"></div>
 <script>
 /* ====== 設定：把你部署 Apps Script Web App 後得到的 /exec 網址貼在這裡 ====== */
-var API_URL = "https://script.google.com/macros/library/d/1i_Hq9iz9BCL-KiwEyrPn6IxxY8NYe6-4UFBfpcWBmyzdgRuq8ZBc7L-k/2";
+var API_URL = "https://script.google.com/macros/s/AKfycbzgU2w35l-9WR9cywjY9hyc5up7PQtSCMIohtE485kUV7lIyLf-VWqtN0ymhDKe1PFHQA/exec";
 /* ========================================================================= */
 
 var S = { token: null, user: null, spec: null, view: "dashboard", state: null };
+
+/* 角色顯示名稱（僅畫面顯示，不影響底層權限判斷） */
+var ROLE_DISPLAY = { sam:"Manager", jeffrey:"Site", jin:"Site", sue:"Site",
+  yong:"Offshore Site Leader", paul:"Env_Manager", lin:"PTW_Coordinator" };
+function roleLabel(key, role){ return ROLE_DISPLAY[key] || role || ""; }
 
 function $(sel, el){ return (el||document).querySelector(sel); }
 function el(html){ var d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstChild; }
@@ -143,7 +148,7 @@ function renderApp(){
     tab("form","我的申報")+
     (isMgr?tab("review","Manager Review"):"")+
     (isMgr?tab("report","報表輸出"):"")+
-    '<span class="who">'+esc(S.user.name)+'（'+esc(S.user.role)+'）</span>'+
+    '<span class="who">'+esc(S.user.name)+'（'+esc(roleLabel(S.user.key,S.user.role))+'）</span>'+
     '<a class="lo" id="logoutLink">登出</a></nav></header>');
   root.appendChild(nav);
   var wrap=el('<main class="wrap" id="view"></main>'); root.appendChild(wrap);
@@ -184,7 +189,7 @@ function renderDashboard(v){
       '<span class="msg" id="openMsg"></span></div></section>'));
   }
   var rows=ov.rows.map(function(r){
-    return '<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.role)+'</td>'+
+    return '<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(roleLabel(r.key,r.role))+'</td>'+
       '<td><span class="badge s-'+r.status+'">'+statusLabel(r.status)+'</span></td>'+
       '<td>'+(r.version||"—")+'</td><td class="muted">'+esc(r.returned_reason||"")+'</td></tr>';
   }).join("");
@@ -367,7 +372,7 @@ function renderReview(v){
     var acts = (r.status==="SUBMITTED")
       ? '<button class="btn small" data-approve="'+r.key+'">核准</button> <button class="btn small danger" data-return="'+r.key+'">退回</button>'
       : (r.status==="APPROVED"?'<span class="muted">已核准</span>':'<span class="muted">—</span>');
-    return '<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.role)+'</td>'+
+    return '<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(roleLabel(r.key,r.role))+'</td>'+
       '<td><span class="badge s-'+r.status+'">'+statusLabel(r.status)+'</span></td><td>'+acts+'</td></tr>';
   }).join("");
   var sec=el('<section class="card"><h2>提交狀態與審查</h2><table><thead><tr><th>人員</th><th>角色</th><th>狀態</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>'+
