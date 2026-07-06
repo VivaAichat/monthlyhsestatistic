@@ -177,6 +177,12 @@ function renderDashboard(v){
     '<div class="card metric"><b>'+(ov.not_submitted.length)+'</b><span>尚未提交人數</span></div>'+
     '<div class="card metric"><b><span class="badge s-'+(mine.status||"NOT_STARTED")+'">'+statusLabel(mine.status)+'</span></b><span>我的狀態</span></div>'+
     '<div class="card metric"><b>'+(mine.version||0)+'</b><span>我的提交版次</span></div></div>'));
+  if(S.user.role==="MANAGER" || S.user.key==="jeffrey"){
+    v.appendChild(el('<section class="card"><h2>月份管理</h2>'+
+      '<p class="muted">目前月份 <b>'+esc(S.state.period)+'</b>。收齊本月後,按下方進到下一個月;本月資料會保留,新月份由大家重新填寫。</p>'+
+      '<div class="rowacts"><button class="btn" id="openMonth">開新月份（進到下一個月）</button>'+
+      '<span class="msg" id="openMsg"></span></div></section>'));
+  }
   var rows=ov.rows.map(function(r){
     return '<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.role)+'</td>'+
       '<td><span class="badge s-'+r.status+'">'+statusLabel(r.status)+'</span></td>'+
@@ -190,6 +196,15 @@ function renderDashboard(v){
     '<p class="muted">負責項目：'+esc(mySecs.join("、"))+'</p>'+
     '<button class="btn primary" id="goForm">前往填寫</button></section></div>'));
   $("#goForm").onclick=function(){ S.view="form"; renderView(); };
+  var om=$("#openMonth");
+  if(om) om.onclick=function(){
+    if(!confirm("確定進到下一個月嗎?\n目前月份的資料會完整保留,新月份大家需重新填寫。")) return;
+    om.disabled=true;
+    call("openNewMonth",{}).then(function(r){
+      if(!r.ok){ $("#openMsg").innerHTML='<span style="color:#c0392b">'+esc(r.error)+'</span>'; om.disabled=false; return; }
+      refresh().then(function(){ S.view="dashboard"; renderView(); });
+    }).catch(function(e){ $("#openMsg").innerHTML='<span style="color:#c0392b">'+esc(e.message)+'</span>'; om.disabled=false; });
+  };
 }
 function statusLabel(s){return {NOT_STARTED:"尚未開始",DRAFT:"草稿",SUBMITTED:"已提交",RETURNED:"已退回",APPROVED:"已核准",LOCKED:"已鎖定"}[s]||s||"尚未開始";}
 
@@ -331,12 +346,17 @@ function renderForm(v){
   }
   function msg(t,ok){ var m=$("#formMsg"); m.innerHTML='<span style="color:'+(ok===false?"#c0392b":"#1f6f5c")+'">'+esc(t)+'</span>'; }
   var sb=$("#saveBtn"), ub=$("#submitBtn");
-  if(sb) sb.onclick=function(){ call("saveDraft",{payload:collect()}).then(function(r){
-      if(!r.ok){msg(r.error,false);return;} S.state.mine=r.mine; msg("已儲存草稿 · "+new Date().toLocaleTimeString()); }).catch(function(e){msg(e.message,false);}); };
-  if(ub) ub.onclick=function(){ call("saveDraft",{payload:collect()}).then(function(r){
-      if(!r.ok){msg(r.error,false);return;}
-      return call("submit",{}).then(function(r2){ if(!r2.ok){msg(r2.error,false);return;}
-        msg("已提交"); refresh().then(function(){S.view="dashboard";renderView();}); }); }).catch(function(e){msg(e.message,false);}); };
+  if(sb) sb.onclick=function(){ sb.disabled=true; call("saveDraft",{payload:collect()}).then(function(r){
+      sb.disabled=false;
+      if(!r.ok){ msg(r.error,false); alert("儲存失敗：\n"+r.error); return; }
+      S.state.mine=r.mine; msg("已儲存草稿 · "+new Date().toLocaleTimeString());
+      alert("儲存成功"); }).catch(function(e){ sb.disabled=false; msg(e.message,false); alert("儲存失敗：\n"+e.message); }); };
+  if(ub) ub.onclick=function(){ ub.disabled=true; call("saveDraft",{payload:collect()}).then(function(r){
+      if(!r.ok){ ub.disabled=false; msg(r.error,false); alert("提交失敗：\n"+r.error); return; }
+      return call("submit",{}).then(function(r2){
+        if(!r2.ok){ ub.disabled=false; msg(r2.error,false); alert("提交失敗：\n"+r2.error); return; }
+        alert("已提交");
+        refresh().then(function(){ S.view="dashboard"; renderView(); }); }); }).catch(function(e){ ub.disabled=false; msg(e.message,false); alert("提交失敗：\n"+e.message); }); };
 }
 
 /* ---------------- Manager Review ---------------- */
