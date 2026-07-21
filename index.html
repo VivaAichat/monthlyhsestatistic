@@ -69,9 +69,11 @@ var API_URL = "https://script.google.com/macros/s/AKfycbzgU2w35l-9WR9cywjY9hyc5u
 var S = { token: null, user: null, spec: null, view: "dashboard", state: null };
 
 /* 角色顯示名稱（僅畫面顯示，不影響底層權限判斷） */
-var ROLE_DISPLAY = { sam:"Manager", jeffrey:"Site", jin:"Site", sue:"Site",
-  yong:"Offshore Site Leader", paul:"Env_Manager", lin:"PTW_Coordinator" };
+var ROLE_DISPLAY = { sam:"Manager", jeffrey:"Site", jin:"Site",
+  yong:"Offshore Site Leader", tenli:"Site", paul:"Env_Manager", lin:"PTW_Coordinator" };
 function roleLabel(key, role){ return ROLE_DISPLAY[key] || role || ""; }
+/* 期間標題：'2026-07' -> '提交 2026 年 7 月份月統計'（依提交月份呈現） */
+function periodLabel(p){ var m=String(p).match(/^(\d{4})-(\d{2})$/); return m ? ("提交 "+m[1]+" 年 "+(+m[2])+" 月份月統計") : ("提交月統計 "+p); }
 
 function $(sel, el){ return (el||document).querySelector(sel); }
 function el(html){ var d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstChild; }
@@ -113,7 +115,7 @@ function renderLogin(){
    '<label>帳號 Username<input id="u" autofocus></label>'+
    '<label>密碼 Password<input id="p" type="password"></label>'+
    '<button class="btn primary" id="loginBtn" style="width:100%">登入</button>'+
-   '<p class="muted" style="margin-top:14px;font-size:12px">帳號：sam / jeffrey / jin / sue / yong / paul / lin</p></div>');
+   '<p class="muted" style="margin-top:14px;font-size:12px">帳號：sam / jeffrey / jin / yong / tenli / paul / lin</p></div>');
   root.appendChild(box);
   function doLogin(){
     var u=$("#u").value.trim(), p=$("#p").value;
@@ -175,8 +177,8 @@ function renderView(){
 function renderDashboard(v){
   var ov=S.state.overview, mine=S.state.mine.status;
   var mySecs = (S.spec.assignments[S.user.key]||[]).map(function(a){return S.spec.sections[a[1]].zh;});
-  v.appendChild(el('<div class="page-head"><div><h1>'+esc(S.state.period)+'</h1>'+
-    '<div class="muted">Project HSE Monthly Statistics</div></div></div>'));
+  v.appendChild(el('<div class="page-head"><div><h1>'+esc(periodLabel(S.state.period))+'</h1>'+
+    '<div class="muted">Project HSE Monthly Statistics · '+esc(S.state.period)+'</div></div></div>'));
   v.appendChild(el('<div class="cards">'+
     '<div class="card metric"><b>'+ov.percent+'%</b><span>完成比例（'+ov.submitted+'/'+ov.total+'）</span></div>'+
     '<div class="card metric"><b>'+(ov.not_submitted.length)+'</b><span>尚未提交人數</span></div>'+
