@@ -57,13 +57,64 @@ border-radius:7px;cursor:pointer;font:inherit}
 .section h2 .chip{vertical-align:middle}
 .setup{max-width:560px;margin:8vh auto}
 .setup code{background:#0d2b3e;color:#d7e6ea;padding:2px 6px;border-radius:4px;font-size:12px}
+
+/* ===== 載入指示 ===== */
+#topprog{position:fixed;top:0;left:0;height:3px;width:0;z-index:10000;opacity:0;border-radius:0 3px 3px 0;
+  background:linear-gradient(90deg,var(--green),var(--green2));box-shadow:0 0 10px rgba(44,138,114,.65);transition:opacity .2s}
+#topprog.active{opacity:1;width:90%;transition:width 10s cubic-bezier(.05,.7,.1,1),opacity .2s}
+#topprog.done{opacity:1;width:100%;transition:width .3s ease}
+#overlay{position:fixed;inset:0;background:rgba(13,43,62,.32);display:none;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(1.5px)}
+#overlay.show{display:flex}
+.overlay-box{background:#fff;padding:20px 28px;border-radius:14px;display:flex;gap:14px;align-items:center;
+  box-shadow:0 18px 50px rgba(13,43,62,.30);font-size:15px;color:var(--ink);font-weight:500}
+.spinner{width:26px;height:26px;border:3px solid rgba(31,111,92,.20);border-top-color:var(--green);border-radius:50%;
+  animation:spin .7s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== 介面優化 ===== */
+body{background:#eef1f4}
+.wrap{padding:26px 18px 70px}
+.topbar{box-shadow:0 2px 10px rgba(13,43,62,.20);padding:12px 20px}
+.topbar nav{gap:18px}
+.topbar nav a{padding:3px 1px;position:relative;transition:color .15s}
+.topbar nav a.active::after{content:"";position:absolute;left:0;right:0;bottom:-9px;height:2px;background:#8fd3c0;border-radius:2px}
+.page-head h1{letter-spacing:-.3px}
+.card{border:1px solid #e6ebef;border-radius:12px;padding:18px 20px;
+  box-shadow:0 1px 2px rgba(13,43,62,.05),0 3px 10px rgba(13,43,62,.045)}
+.card h2{letter-spacing:.2px;margin-bottom:14px}
+.cards{gap:16px}
+.metric{transition:transform .15s,box-shadow .15s}
+.metric:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(13,43,62,.10)}
+.metric b{font-size:32px;letter-spacing:-.5px}
+.metric span{font-size:12px;letter-spacing:.2px}
+th{font-weight:600;letter-spacing:.3px;background:#f7f9fa;border-bottom:1px solid #e6ebef;color:#5b6b76}
+td,th{padding:9px 12px}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:#f6faf9}
+.btn{transition:transform .12s,box-shadow .15s,background .15s,border-color .15s;border-radius:8px;font-weight:500}
+.btn:hover{transform:translateY(-1px);border-color:#c2ccd2}
+.btn:active{transform:translateY(0)}
+.btn.primary{box-shadow:0 2px 8px rgba(31,111,92,.28)}
+.btn.primary:hover{box-shadow:0 5px 16px rgba(31,111,92,.34);border-color:var(--green)}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+input,select{border-radius:8px;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{outline:none;border-color:var(--green2);box-shadow:0 0 0 3px rgba(44,138,114,.15)}
+.badge{padding:3px 11px;font-weight:600;letter-spacing:.2px}
+.chip{background:#e8f3ef;color:var(--green)}
+.alert{border-radius:10px}
+.formacts{background:rgba(238,241,244,.9);backdrop-filter:blur(6px);border-top:1px solid #e0e6ea;padding:14px 0}
+.login.card{box-shadow:0 14px 44px rgba(13,43,62,.16);border-radius:16px;padding:30px}
+.section h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(max-width:860px){ .wrap{padding:16px 12px 64px} .topbar{padding:10px 14px} .card{padding:15px 16px} .metric b{font-size:27px} }
 </style>
 </head>
 <body>
+<div id="topprog"></div>
+<div id="overlay"><div class="overlay-box"><div class="spinner"></div><span id="overlay-text">處理中…</span></div></div>
 <div id="root"></div>
 <script>
 /* ====== 設定：把你部署 Apps Script Web App 後得到的 /exec 網址貼在這裡 ====== */
-var API_URL = "https://script.google.com/macros/s/AKfycbz6M4p-iUVNzJ9IIn6F4TwNZWUAnZDwuGpD6bL7-xDovS4oTj4yPqtZb9PaGj-GHojf/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbzgU2w35l-9WR9cywjY9hyc5up7PQtSCMIohtE485kUV7lIyLf-VWqtN0ymhDKe1PFHQA/exec";
 /* ========================================================================= */
 
 var S = { token: null, user: null, spec: null, view: "dashboard", state: null };
@@ -79,13 +130,31 @@ function $(sel, el){ return (el||document).querySelector(sel); }
 function el(html){ var d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstChild; }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
 
-async function call(action, extra){
-  var body = Object.assign({ action: action, token: S.token }, extra||{});
-  var res = await fetch(API_URL, { method:"POST",
-    headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(body) });
-  var data = await res.json();
-  if (data && data.error === "請重新登入"){ logout(); throw new Error(data.error); }
-  return data;
+/* ---- 載入指示：頂部進度條 + 中央遮罩 ---- */
+var _topEl,_ovEl,_ovTx;
+function startTop(){ _topEl=_topEl||document.getElementById("topprog"); if(!_topEl)return;
+  _topEl.classList.remove("done"); _topEl.style.width="0"; void _topEl.offsetWidth; _topEl.classList.add("active"); }
+function stopTop(){ if(!_topEl)return; _topEl.classList.remove("active"); _topEl.classList.add("done"); _topEl.style.width="100%";
+  setTimeout(function(){ _topEl.classList.remove("done"); _topEl.style.width="0"; },320); }
+function showOverlay(t){ _ovEl=_ovEl||document.getElementById("overlay"); _ovTx=_ovTx||document.getElementById("overlay-text");
+  if(_ovTx) _ovTx.textContent=t||"處理中…"; if(_ovEl) _ovEl.classList.add("show"); }
+function hideOverlay(){ if(_ovEl) _ovEl.classList.remove("show"); }
+function busyBtn(btn,label){ if(!btn)return function(){}; var o=btn.textContent; btn.disabled=true; if(label)btn.textContent=label;
+  return function(){ btn.disabled=false; if(label)btn.textContent=o; }; }
+
+async function call(action, extra, mode){
+  var ind = mode || "top";
+  if(ind==="heavy") showOverlay(); else if(ind!=="silent") startTop();
+  try{
+    var body = Object.assign({ action: action, token: S.token }, extra||{});
+    var res = await fetch(API_URL, { method:"POST",
+      headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(body) });
+    var data = await res.json();
+    if (data && data.error === "請重新登入"){ logout(); throw new Error(data.error); }
+    return data;
+  } finally {
+    if(ind==="heavy") hideOverlay(); else if(ind!=="silent") stopTop();
+  }
 }
 
 /* ---------------- 開機 ---------------- */
@@ -119,14 +188,16 @@ function renderLogin(){
   root.appendChild(box);
   function doLogin(){
     var u=$("#u").value.trim(), p=$("#p").value;
+    var done=busyBtn(document.getElementById("loginBtn"),"登入中…");
     call("login",{username:u,password:p}).then(function(r){
+      done();
       if(!r.ok){ $("#loginMsg").innerHTML='<span style="color:#c0392b">'+esc(r.error)+'</span>'; return; }
       S.token=r.token; S.user=r.user; S.spec=r.spec;
       localStorage.setItem("hse_token",r.token);
       localStorage.setItem("hse_user",JSON.stringify(r.user));
       localStorage.setItem("hse_spec",JSON.stringify(r.spec));
       S.view="dashboard"; refresh().then(renderApp);
-    }).catch(function(e){ $("#loginMsg").innerHTML='<span style="color:#c0392b">連線失敗：'+esc(e.message)+'</span>'; });
+    }).catch(function(e){ done(); $("#loginMsg").innerHTML='<span style="color:#c0392b">連線失敗：'+esc(e.message)+'</span>'; });
   }
   $("#loginBtn").onclick=doLogin;
   box.addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
@@ -207,7 +278,7 @@ function renderDashboard(v){
   if(om) om.onclick=function(){
     if(!confirm("確定進到下一個月嗎?\n目前月份的資料會完整保留,新月份大家需重新填寫。")) return;
     om.disabled=true;
-    call("openNewMonth",{}).then(function(r){
+    call("openNewMonth",{},"heavy").then(function(r){
       if(!r.ok){ $("#openMsg").innerHTML='<span style="color:#c0392b">'+esc(r.error)+'</span>'; om.disabled=false; return; }
       refresh().then(function(){ S.view="dashboard"; renderView(); });
     }).catch(function(e){ $("#openMsg").innerHTML='<span style="color:#c0392b">'+esc(e.message)+'</span>'; om.disabled=false; });
@@ -353,17 +424,17 @@ function renderForm(v){
   }
   function msg(t,ok){ var m=$("#formMsg"); m.innerHTML='<span style="color:'+(ok===false?"#c0392b":"#1f6f5c")+'">'+esc(t)+'</span>'; }
   var sb=$("#saveBtn"), ub=$("#submitBtn");
-  if(sb) sb.onclick=function(){ sb.disabled=true; call("saveDraft",{payload:collect()}).then(function(r){
-      sb.disabled=false;
+  if(sb) sb.onclick=function(){ var done=busyBtn(sb,"儲存中…"); call("saveDraft",{payload:collect()}).then(function(r){
+      done();
       if(!r.ok){ msg(r.error,false); alert("儲存失敗：\n"+r.error); return; }
       S.state.mine=r.mine; msg("已儲存草稿 · "+new Date().toLocaleTimeString());
-      alert("儲存成功"); }).catch(function(e){ sb.disabled=false; msg(e.message,false); alert("儲存失敗：\n"+e.message); }); };
-  if(ub) ub.onclick=function(){ ub.disabled=true; call("saveDraft",{payload:collect()}).then(function(r){
-      if(!r.ok){ ub.disabled=false; msg(r.error,false); alert("提交失敗：\n"+r.error); return; }
-      return call("submit",{}).then(function(r2){
-        if(!r2.ok){ ub.disabled=false; msg(r2.error,false); alert("提交失敗：\n"+r2.error); return; }
-        alert("已提交");
-        refresh().then(function(){ S.view="dashboard"; renderView(); }); }); }).catch(function(e){ ub.disabled=false; msg(e.message,false); alert("提交失敗：\n"+e.message); }); };
+      alert("儲存成功"); }).catch(function(e){ done(); msg(e.message,false); alert("儲存失敗：\n"+e.message); }); };
+  if(ub) ub.onclick=function(){ ub.disabled=true; showOverlay("提交中…"); call("saveDraft",{payload:collect()},"silent").then(function(r){
+      if(!r.ok){ hideOverlay(); ub.disabled=false; msg(r.error,false); alert("提交失敗：\n"+r.error); return; }
+      return call("submit",{},"silent").then(function(r2){
+        if(!r2.ok){ hideOverlay(); ub.disabled=false; msg(r2.error,false); alert("提交失敗：\n"+r2.error); return; }
+        hideOverlay(); alert("已提交");
+        refresh().then(function(){ S.view="dashboard"; renderView(); }); }); }).catch(function(e){ hideOverlay(); ub.disabled=false; msg(e.message,false); alert("提交失敗：\n"+e.message); }); };
 }
 
 /* ---------------- Manager Review ---------------- */
@@ -394,7 +465,7 @@ function renderReview(v){
   sec.querySelectorAll("[data-return]").forEach(function(b){ b.onclick=function(){
     var reason=prompt("退回原因："); if(!reason) return;
     call("returnSubmission",{user_key:b.getAttribute("data-return"),reason:reason}).then(function(r){ if(!r.ok){revMsg(r.error,false);return;} refresh().then(renderView); }); }; });
-  $("#finBtn").onclick=function(){ call("finalize",{}).then(function(r){
+  $("#finBtn").onclick=function(){ call("finalize",{},"heavy").then(function(r){
       if(!r.ok){revMsg(r.error,false);return;}
       revMsg("已最終核准並寫入報表。可到「報表輸出」開啟 Google Sheet 下載 Excel。");
       refresh().then(renderView); }).catch(function(e){revMsg(e.message,false);}); };
@@ -413,7 +484,7 @@ function renderReport(v){
   v.appendChild(el('<div class="page-head"><div><h1>報表輸出 — '+esc(S.state.period)+'</h1>'+
     '<div class="muted">給總部長官的月統計彙整</div></div></div>'));
   v.appendChild(el('<div class="msg" id="repMsg">彙整中…</div>'));
-  call("report",{}).then(function(r){
+  call("report",{},"heavy").then(function(r){
     if(!r.ok){ $("#repMsg").innerHTML='<span style="color:#c0392b">'+esc(r.error)+'</span>'; return; }
     $("#repMsg").innerHTML="";
     var acts=el('<section class="card"><h2>取得給長官的 Excel</h2>'+
