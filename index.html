@@ -106,6 +106,29 @@ input:focus,select:focus{outline:none;border-color:var(--green2);box-shadow:0 0 
 .login.card{box-shadow:0 14px 44px rgba(13,43,62,.16);border-radius:16px;padding:30px}
 .section h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 @media(max-width:860px){ .wrap{padding:16px 12px 64px} .topbar{padding:10px 14px} .card{padding:15px 16px} .metric b{font-size:27px} }
+
+/* ===== 表單：緊湊欄位表 ===== */
+.form-tbl{table-layout:fixed}
+.form-tbl th{font-size:11px;color:#8a99a3}
+.form-tbl td,.form-tbl th{padding:7px 12px;vertical-align:middle}
+.form-tbl .fld{width:50%}
+.form-tbl .fld-zh{font-weight:600;color:var(--ink)}
+.form-tbl .fld-en{display:block;font-size:11px;color:#9aa8b1;margin-top:1px;letter-spacing:.2px}
+.form-tbl .val{width:26%}
+.form-tbl .val input{width:100%;max-width:160px;text-align:right}
+.form-tbl .nt{width:24%}
+.form-tbl .nt input{width:100%;border-style:dashed;background:#fcfdfd}
+.form-tbl tbody tr:hover{background:#f6faf9}
+/* ===== 明細表 + 空狀態提示 ===== */
+.detail-tbl th{font-size:11px;padding:7px 10px;color:#8a99a3}
+.detail-tbl td{padding:6px 10px}
+.detail-tbl input,.detail-tbl select{padding:5px 7px;font-size:13px}
+.detail-tbl .t-calc{font-weight:600;color:var(--green)}
+.empty-hint{color:#8a99a3;font-size:13px;background:#f7f9fa;border:1px dashed #d8e0e5;
+  border-radius:9px;padding:14px 16px;margin:4px 0 2px;text-align:center}
+.section .rowacts{margin-top:12px}
+.section .rowacts .btn.small{background:#f4f7f6;border-color:#dbe6e2;color:var(--green)}
+.section .rowacts .btn.small:hover{background:#e8f3ef}
 </style>
 </head>
 <body>
@@ -316,23 +339,27 @@ function renderForm(v){
         var val = f.type==="date"?(r.date||""):(f.type==="text"?(r.text||""):(r.value===0?0:(r.value||"")));
         var type = f.type==="date"?"date":(f.type==="text"?"text":"number");
         var stepAttr = (f.type==="int")?'step="1"':(f.type==="decimal"?'step="any"':"");
-        return '<tr><td>'+esc(f.zh)+(f.required?' <span class="req">*</span>':'')+'</td>'+
-          '<td class="en">'+esc(f.en)+'</td><td class="muted">'+esc(f.unit||"")+'</td>'+
-          '<td><input class="cell cellw" data-section="'+code+'" data-field="'+f.code+'" data-type="'+f.type+'" type="'+type+'" '+(f.type!=="text"&&f.type!=="date"?'min="0" '+stepAttr:"")+' value="'+esc(val)+'" '+(readOnly?"disabled":"")+'></td>'+
-          '<td><input class="note" data-section="'+code+'" data-field="'+f.code+'" value="'+esc(r.notes||"")+'" placeholder="選填" '+(readOnly?"disabled":"")+'></td></tr>';
+        var sub = esc(f.en||"")+(f.unit?((f.en?" · ":"")+esc(f.unit)):"");
+        return '<tr><td class="fld"><span class="fld-zh">'+esc(f.zh)+(f.required?' <span class="req">*</span>':'')+'</span>'+
+          (sub?'<span class="fld-en">'+sub+'</span>':'')+'</td>'+
+          '<td class="val"><input class="cell" data-section="'+code+'" data-field="'+f.code+'" data-type="'+f.type+'" type="'+type+'" '+(f.type!=="text"&&f.type!=="date"?'min="0" '+stepAttr:"")+' value="'+esc(val)+'" '+(readOnly?"disabled":"")+'></td>'+
+          '<td class="nt"><input class="note" data-section="'+code+'" data-field="'+f.code+'" value="'+esc(r.notes||"")+'" placeholder="備註（選填）" '+(readOnly?"disabled":"")+'></td></tr>';
       }).join("");
-      sc.appendChild(el('<table><thead><tr><th>欄位</th><th>Excel 欄位</th><th>單位</th><th>數值</th><th>備註</th></tr></thead><tbody>'+rows+'</tbody></table>'));
+      sc.appendChild(el('<table class="form-tbl"><thead><tr><th>項目</th><th>數值</th><th>備註</th></tr></thead><tbody>'+rows+'</tbody></table>'));
     } else if(sec.detail==="training"){
       sc.appendChild(el('<p class="muted">計算時數 = 出席人次 × 每人時數；系統依類別自動帶入預設時數，可逐列調整。</p>'));
-      sc.appendChild(el('<table id="trainTbl"><thead><tr><th>類別</th><th>子類型</th><th>名稱</th><th>日期</th><th>Sessions</th><th>Attendees</th><th>Hrs/人</th><th>計算</th><th></th></tr></thead><tbody></tbody></table>'));
+      sc.appendChild(el('<div class="empty-hint" id="trainHint">尚無訓練紀錄，點下方按鈕新增一列。</div>'));
+      sc.appendChild(el('<table id="trainTbl" class="detail-tbl"><thead><tr><th>類別</th><th>子類型</th><th>名稱</th><th>日期</th><th>Sessions</th><th>Attendees</th><th>Hrs/人</th><th>計算</th><th></th></tr></thead><tbody></tbody></table>'));
       if(!readOnly) sc.appendChild(el('<div class="rowacts">'+
         ['INDUCTION','GROUP_MEETING','TBT','IN_HOUSE','EXTERNAL'].map(function(c){return '<button type="button" class="btn small" data-add="'+c+'">+ '+c+'</button>';}).join("")+'</div>'));
     } else if(sec.detail==="observations"){
       sc.appendChild(el('<p class="muted">分開記錄來源；Unsafe 與 Safe 各自加總。</p>'));
-      sc.appendChild(el('<table id="obsTbl"><thead><tr><th>來源</th><th>類型</th><th>數量</th><th>備註</th><th></th></tr></thead><tbody></tbody></table>'));
+      sc.appendChild(el('<div class="empty-hint" id="obsHint">尚無觀察紀錄，點下方按鈕新增。</div>'));
+      sc.appendChild(el('<table id="obsTbl" class="detail-tbl"><thead><tr><th>來源</th><th>類型</th><th>數量</th><th>備註</th><th></th></tr></thead><tbody></tbody></table>'));
       if(!readOnly) sc.appendChild(el('<div class="rowacts"><button type="button" class="btn small" id="addObs">+ 新增觀察</button></div>'));
     } else if(sec.detail==="drills"){
-      sc.appendChild(el('<table id="drillTbl"><thead><tr><th>名稱</th><th>日期</th><th>類型</th><th>數量</th><th>備註</th><th></th></tr></thead><tbody></tbody></table>'));
+      sc.appendChild(el('<div class="empty-hint" id="drillHint">尚無演練紀錄，點下方按鈕新增。</div>'));
+      sc.appendChild(el('<table id="drillTbl" class="detail-tbl"><thead><tr><th>名稱</th><th>日期</th><th>類型</th><th>數量</th><th>備註</th><th></th></tr></thead><tbody></tbody></table>'));
       if(!readOnly) sc.appendChild(el('<div class="rowacts"><button type="button" class="btn small" id="addDrill">+ 新增演練</button></div>'));
     }
     form.appendChild(sc);
@@ -340,6 +367,9 @@ function renderForm(v){
 
   if(!readOnly) v.appendChild(el('<div class="formacts"><button class="btn" id="saveBtn">儲存草稿</button><button class="btn primary" id="submitBtn">提交</button></div>'));
 
+  function syncEmpty(sel,hintSel){ var t=form.querySelector(sel), h=form.querySelector(hintSel);
+    if(!t) return; var has=t.querySelector("tbody").children.length>0;
+    t.style.display=has?"":"none"; if(h) h.style.display=has?"none":""; }
   // 訓練列
   var trainBody = form.querySelector("#trainTbl tbody");
   function trainRow(e){
@@ -357,7 +387,7 @@ function renderForm(v){
       '<td><input class="t-att" type="number" min="0" step="1" value="'+(e.attendees||0)+'"></td>'+
       '<td><input class="t-hpa" type="number" min="0" step="any" value="'+(e.hpa===0?0:(e.hpa||""))+'"></td>'+
       '<td class="t-calc mono">0</td><td><button type="button" class="btn small danger t-del">✕</button></td>';
-    trainBody.appendChild(tr);
+    trainBody.appendChild(tr); syncEmpty("#trainTbl","#trainHint");
     var catSel=tr.querySelector(".t-cat"), subSel=tr.querySelector(".t-sub"),
         att=tr.querySelector(".t-att"), hpa=tr.querySelector(".t-hpa"), calc=tr.querySelector(".t-calc");
     function def(){ return catSel.value==="GROUP_MEETING"?spec.trainingDefaults[subSel.value]:spec.trainingDefaults[catSel.value]; }
@@ -366,13 +396,14 @@ function renderForm(v){
     catSel.onchange=function(){ hpa.value=""; syncSub(); var d=def(); if(d!=null)hpa.value=d; recalc(); };
     subSel.onchange=function(){ var d=def(); if(d!=null)hpa.value=d; recalc(); };
     att.oninput=recalc; hpa.oninput=recalc;
-    tr.querySelector(".t-del").onclick=function(){ tr.remove(); };
+    tr.querySelector(".t-del").onclick=function(){ tr.remove(); syncEmpty("#trainTbl","#trainHint"); };
     syncSub(); if(hpa.value===""){var d=def(); if(d!=null)hpa.value=d;} recalc();
     if(readOnly) tr.querySelectorAll("input,select,button").forEach(function(x){x.disabled=true;});
   }
   if(trainBody){
     (mine.training||[]).forEach(function(t){ trainRow({category:t.category,subcategory:t.subcategory,title:t.title,date:t.date,sessions:t.sessions,attendees:t.attendees,hpa:t.hpa}); });
     form.querySelectorAll("[data-add]").forEach(function(b){ b.onclick=function(){ trainRow({category:b.getAttribute("data-add"),subcategory:b.getAttribute("data-add")==="GROUP_MEETING"?"HSE_REVIEW_MEETING":""}); }; });
+    syncEmpty("#trainTbl","#trainHint");
   }
   // 觀察列
   var obsBody=form.querySelector("#obsTbl tbody");
@@ -381,9 +412,9 @@ function renderForm(v){
       '<td><select class="o-type">'+["UNSAFE","SAFE"].map(function(s){return '<option '+(o.type===s?"selected":"")+'>'+s+'</option>';}).join("")+'</select></td>'+
       '<td><input class="o-qty" type="number" min="0" step="1" value="'+(o.quantity||0)+'"></td>'+
       '<td><input class="o-note" value="'+esc(o.notes||"")+'"></td><td><button type="button" class="btn small danger o-del">✕</button></td>';
-    obsBody.appendChild(tr); tr.querySelector(".o-del").onclick=function(){tr.remove();};
+    obsBody.appendChild(tr); syncEmpty("#obsTbl","#obsHint"); tr.querySelector(".o-del").onclick=function(){tr.remove(); syncEmpty("#obsTbl","#obsHint");};
     if(readOnly) tr.querySelectorAll("input,select,button").forEach(function(x){x.disabled=true;}); }
-  if(obsBody){ (mine.observations||[]).forEach(obsRow); var ab=$("#addObs"); if(ab) ab.onclick=function(){obsRow();}; }
+  if(obsBody){ (mine.observations||[]).forEach(obsRow); var ab=$("#addObs"); if(ab) ab.onclick=function(){obsRow();}; syncEmpty("#obsTbl","#obsHint"); }
   // 演練列
   var drillBody=form.querySelector("#drillTbl tbody");
   function drillRow(d){ d=d||{}; var tr=document.createElement("tr");
@@ -392,9 +423,9 @@ function renderForm(v){
       '<td><input class="d-type" value="'+esc(d.type||"")+'"></td>'+
       '<td><input class="d-qty" type="number" min="0" step="1" value="'+(d.quantity!=null?d.quantity:1)+'"></td>'+
       '<td><input class="d-note" value="'+esc(d.notes||"")+'"></td><td><button type="button" class="btn small danger d-del">✕</button></td>';
-    drillBody.appendChild(tr); tr.querySelector(".d-del").onclick=function(){tr.remove();};
+    drillBody.appendChild(tr); syncEmpty("#drillTbl","#drillHint"); tr.querySelector(".d-del").onclick=function(){tr.remove(); syncEmpty("#drillTbl","#drillHint");};
     if(readOnly) tr.querySelectorAll("input,select,button").forEach(function(x){x.disabled=true;}); }
-  if(drillBody){ (mine.drills||[]).forEach(drillRow); var db=$("#addDrill"); if(db) db.onclick=function(){drillRow();}; }
+  if(drillBody){ (mine.drills||[]).forEach(drillRow); var db=$("#addDrill"); if(db) db.onclick=function(){drillRow();}; syncEmpty("#drillTbl","#drillHint"); }
 
   function collect(){
     var payload={values:{}};
