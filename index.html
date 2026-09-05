@@ -205,9 +205,9 @@ function renderLogin(){
    '<p class="muted">Project HSE Monthly Statistics</p>'+
    '<div class="msg" id="loginMsg"></div>'+
    '<label>帳號 Username<input id="u" autofocus></label>'+
-   '<label>密碼 Password<input id="p" type="password"></label>'+
+   '<label>密碼 Password<input id="p" type="password" value="hse1234"></label>'+
    '<button class="btn primary" id="loginBtn" style="width:100%">登入</button>'+
-   '<p class="muted" style="margin-top:14px;font-size:12px">帳號：sam / jeffrey / jin / yong / tenli / paul / lin</p></div>');
+   '<p class="muted" style="margin-top:14px;font-size:12px">帳號：sam / jeffrey / jin / yong / tenli / paul / lin<br>密碼一律：<b>hse1234</b>（已為你預先填入，直接按登入即可）</p></div>');
   root.appendChild(box);
   function doLogin(){
     var u=$("#u").value.trim(), p=$("#p").value;
@@ -243,6 +243,7 @@ function renderApp(){
     tab("dashboard","Dashboard")+
     tab("form","我的申報")+
     (isMgr?tab("review","Manager Review"):"")+
+    (isMgr?tab("admin","管理員編輯"):"")+
     (isMgr?tab("report","報表輸出"):"")+
     '<span class="who">'+esc(S.user.name)+'（'+esc(roleLabel(S.user.key,S.user.role))+'）</span>'+
     '<a class="lo" id="logoutLink">登出</a></nav></header>');
@@ -264,6 +265,7 @@ function renderView(){
   if(S.view==="dashboard") renderDashboard(v);
   else if(S.view==="form") renderForm(v);
   else if(S.view==="review") renderReview(v);
+  else if(S.view==="admin") renderAdmin(v);
   else if(S.view==="report") renderReport(v);
 }
 
@@ -310,21 +312,26 @@ function renderDashboard(v){
 function statusLabel(s){return {NOT_STARTED:"尚未開始",DRAFT:"草稿",SUBMITTED:"已提交",RETURNED:"已退回",APPROVED:"已核准",LOCKED:"已鎖定"}[s]||s||"尚未開始";}
 
 /* ---------------- 我的申報表單 ---------------- */
-function renderForm(v){
-  var period=S.state.period, mine=S.state.mine, spec=S.spec;
-  var pairs = S.user.role==="MANAGER"
+function renderForm(v, who, mine, opts){
+  who=who||S.user; mine=mine||S.state.mine; opts=opts||{}; var admin=!!opts.admin;
+  var period=S.state.period, spec=S.spec;
+  var pairs = who.role==="MANAGER"
       ? Object.keys(spec.sections).filter(function(k){return !spec.sections[k].detail && ["PROJECT_GENERAL","INCIDENTS","LTI_DETAILS","ENERGY"].indexOf(k)>=0;}).map(function(k){return ["PROJECT_WIDE",k];})
-      : (spec.assignments[S.user.key]||[]);
+      : (spec.assignments[who.key]||[]);
   var st=mine.status.status;
-  var readOnly = (st==="SUBMITTED"||st==="APPROVED"||st==="LOCKED");
+  var readOnly = admin ? false : (st==="SUBMITTED"||st==="APPROVED"||st==="LOCKED");
 
   // 既有值索引
   var vmap={}; (mine.values||[]).forEach(function(r){ vmap[r.section+"|"+r.field]=r; });
 
-  v.appendChild(el('<div class="page-head"><div><h1>我的申報 — '+esc(period)+'</h1>'+
-    '<div class="muted">'+esc(S.user.name)+' · <span class="badge s-'+st+'">'+statusLabel(st)+'</span>'+(mine.status.version?'（v'+mine.status.version+'）':'')+'</div></div></div>'));
-  if(st==="RETURNED") v.appendChild(el('<div class="alert error">此申報已被退回：'+esc(mine.status.returned_reason)+'。修改後重新提交。</div>'));
-  if(readOnly) v.appendChild(el('<div class="alert">目前唯讀（已提交／已核准）。需修改請待經理退回。</div>'));
+  if(admin){
+    v.appendChild(el('<div class="alert" style="margin-top:4px">正在編輯：<b>'+esc(who.name)+'</b>（'+esc(roleLabel(who.key,who.role))+'）· 目前狀態 <span class="badge s-'+st+'">'+statusLabel(st)+'</span>。儲存後維持此狀態並自動重算報表。</div>'));
+  } else {
+    v.appendChild(el('<div class="page-head"><div><h1>我的申報 — '+esc(period)+'</h1>'+
+      '<div class="muted">'+esc(who.name)+' · <span class="badge s-'+st+'">'+statusLabel(st)+'</span>'+(mine.status.version?'（v'+mine.status.version+'）':'')+'</div></div></div>'));
+    if(st==="RETURNED") v.appendChild(el('<div class="alert error">此申報已被退回：'+esc(mine.status.returned_reason)+'。修改後重新提交。</div>'));
+    if(readOnly) v.appendChild(el('<div class="alert">目前唯讀（已提交／已核准）。需修改請待經理退回。</div>'));
+  }
   v.appendChild(el('<div class="msg" id="formMsg"></div>'));
 
   var form=el('<form id="hseForm"></form>'); v.appendChild(form);
@@ -365,7 +372,8 @@ function renderForm(v){
     form.appendChild(sc);
   });
 
-  if(!readOnly) v.appendChild(el('<div class="formacts"><button class="btn" id="saveBtn">儲存草稿</button><button class="btn primary" id="submitBtn">提交</button></div>'));
+  if(admin) v.appendChild(el('<div class="formacts"><button class="btn primary" id="adminSaveBtn">儲存並重算</button></div>'));
+  else if(!readOnly) v.appendChild(el('<div class="formacts"><button class="btn" id="saveBtn">儲存草稿</button><button class="btn primary" id="submitBtn">提交</button></div>'));
 
   function syncEmpty(sel,hintSel){ var t=form.querySelector(sel), h=form.querySelector(hintSel);
     if(!t) return; var has=t.querySelector("tbody").children.length>0;
@@ -377,7 +385,7 @@ function renderForm(v){
     var tr=document.createElement("tr");
     var cat=e.category||"INDUCTION";
     var subOpts=spec.gmSubtypes.map(function(s){
-      if(s==="HSE_MONTHLY_MEETING" && S.user.key!==spec.monthlyUser) return "";
+      if(s==="HSE_MONTHLY_MEETING" && who.key!==spec.monthlyUser) return "";
       return '<option value="'+s+'" '+(e.subcategory===s?"selected":"")+'>'+esc(spec.gmLabels[s]||s)+'</option>';}).join("");
     tr.innerHTML='<td><select class="t-cat">'+['INDUCTION','GROUP_MEETING','TBT','IN_HOUSE','EXTERNAL'].map(function(c){return '<option '+(cat===c?"selected":"")+'>'+c+'</option>';}).join("")+'</select></td>'+
       '<td><select class="t-sub">'+subOpts+'</select></td>'+
@@ -454,7 +462,12 @@ function renderForm(v){
     return payload;
   }
   function msg(t,ok){ var m=$("#formMsg"); m.innerHTML='<span style="color:'+(ok===false?"#c0392b":"#1f6f5c")+'">'+esc(t)+'</span>'; }
-  var sb=$("#saveBtn"), ub=$("#submitBtn");
+  var sb=$("#saveBtn"), ub=$("#submitBtn"), asb=$("#adminSaveBtn");
+  if(asb) asb.onclick=function(){ asb.disabled=true; showOverlay("儲存並重算…"); call("adminSaveUser",{user_key:who.key,payload:collect()},"silent").then(function(r){
+      hideOverlay(); asb.disabled=false;
+      if(!r.ok){ msg(r.error,false); alert("儲存失敗：\n"+r.error); return; }
+      msg("已儲存並重算 · "+new Date().toLocaleTimeString()); alert("已儲存並重算，"+who.name+" 的資料已更新，報表同步。");
+    }).catch(function(e){ hideOverlay(); asb.disabled=false; msg(e.message,false); alert("儲存失敗：\n"+e.message); }); };
   if(sb) sb.onclick=function(){ var done=busyBtn(sb,"儲存中…"); call("saveDraft",{payload:collect()}).then(function(r){
       done();
       if(!r.ok){ msg(r.error,false); alert("儲存失敗：\n"+r.error); return; }
@@ -466,6 +479,30 @@ function renderForm(v){
         if(!r2.ok){ hideOverlay(); ub.disabled=false; msg(r2.error,false); alert("提交失敗：\n"+r2.error); return; }
         hideOverlay(); alert("已提交");
         refresh().then(function(){ S.view="dashboard"; renderView(); }); }); }).catch(function(e){ hideOverlay(); ub.disabled=false; msg(e.message,false); alert("提交失敗：\n"+e.message); }); };
+}
+
+/* ---------------- 管理員編輯 ---------------- */
+function renderAdmin(v){
+  v.appendChild(el('<div class="page-head"><div><h1>管理員編輯 — '+esc(S.state.period)+'</h1>'+
+    '<div class="muted">代為修改任一人的數字，儲存後維持原狀態並自動重算報表</div></div></div>'));
+  var picker=el('<section class="card"><h2>選擇要編輯的人員</h2><div class="rowacts" id="pickRow"></div></section>');
+  v.appendChild(picker);
+  var host=el('<div id="adminHost"></div>'); v.appendChild(host);
+  var pr=picker.querySelector("#pickRow");
+  (S.state.overview.rows||[]).forEach(function(u){
+    var b=el('<button class="btn" data-uk="'+u.key+'">'+esc(u.name)+'（'+esc(roleLabel(u.key,u.role))+'）</button>');
+    b.onclick=function(){
+      pr.querySelectorAll("[data-uk]").forEach(function(x){x.classList.remove("primary");});
+      b.classList.add("primary");
+      host.innerHTML=""; host.appendChild(el('<div class="msg">載入中…</div>'));
+      call("adminGetUser",{user_key:u.key}).then(function(r){
+        host.innerHTML="";
+        if(!r.ok){ host.appendChild(el('<div class="alert error">'+esc(r.error)+'</div>')); return; }
+        renderForm(host, r.target, r.mine, {admin:true});
+      }).catch(function(e){ host.innerHTML=""; host.appendChild(el('<div class="alert error">'+esc(e.message)+'</div>')); });
+    };
+    pr.appendChild(b);
+  });
 }
 
 /* ---------------- Manager Review ---------------- */
